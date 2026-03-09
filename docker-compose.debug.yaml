@@ -1,0 +1,8 @@
+services:
+  sciguide-backend:
+    command: sh -c "python -m debugpy --listen 0.0.0.0:5678 -m main"
+    ports:
+      - "5678:5678"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
