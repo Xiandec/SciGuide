@@ -1,11 +1,7 @@
 """Configuration settings for the application."""
 
-from pathlib import Path
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -13,11 +9,7 @@ class Settings(BaseSettings):
     Settings configuration class for application environment variables.
     """
 
-    model_config = SettingsConfigDict(
-        env_file=PROJECT_ROOT / ".env",
-        extra="ignore",
-        case_sensitive=True,
-    )
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     debug: bool = Field(default=False, validation_alias="APP_DEBUG")
     host: str = Field(default="0.0.0.0", validation_alias="APP_HOST")
