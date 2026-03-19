@@ -30,6 +30,7 @@ async def lifespan(app_instance: FastAPI):
         port=settings.redis_port,
         db=settings.redis_db,
         password=settings.redis_password,
+        decode_responses=True,
     )
     app_instance.state.redis = redis_client
 

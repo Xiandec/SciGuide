@@ -1,22 +1,41 @@
-"""Mock authentication routes."""
+"""Authentication API routes."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from auth.application.use_cases.login_user import LoginUser
+from auth.application.use_cases.login_user import LoginUserRequest
+from auth.application.use_cases.logout_user import LogoutUser
+from auth.application.use_cases.logout_user import LogoutUserRequest
+from auth.application.use_cases.refresh_session import RefreshSession
+from auth.application.use_cases.refresh_session import RefreshSessionRequest
+from auth.domain.exceptions.auth_exceptions import InactiveUserError
+from auth.domain.exceptions.auth_exceptions import InvalidCredentialsError
+from auth.domain.exceptions.auth_exceptions import InvalidRefreshTokenError
+from auth.presentation.api.dependencies import get_login_user_use_case
+from auth.presentation.api.dependencies import get_logout_user_use_case
+from auth.presentation.api.dependencies import get_refresh_session_use_case
 from auth.presentation.api.schemas.auth_schemas import LoginRequest
 from auth.presentation.api.schemas.auth_schemas import LoginResponse
 from auth.presentation.api.schemas.auth_schemas import LogoutRequest
 from auth.presentation.api.schemas.auth_schemas import RefreshTokenRequest
 from auth.presentation.api.schemas.auth_schemas import RefreshTokenResponse
 from auth.presentation.api.schemas.auth_schemas import UserSummaryResponse
-from shared.presentation.api.dependencies.security import MockPrincipal
+from shared.presentation.api.dependencies.security import (
+    AuthenticatedPrincipal,
+)
 from shared.presentation.api.dependencies.security import get_current_principal
-from shared.presentation.api.mock_data import MOCK_ACCESS_TOKEN
-from shared.presentation.api.mock_data import MOCK_REFRESH_TOKEN
-from shared.presentation.api.mock_data import build_user_summary
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+def _raise_unauthorized(detail: str) -> None:
+    """Raise a standard unauthorized HTTP error."""
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+    )
 
 
 @router.post(
@@ -25,20 +44,30 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
     status_code=status.HTTP_200_OK,
     summary="Вход",
 )
-async def login(payload: LoginRequest) -> LoginResponse:
-    """Return a mocked JWT pair and current user profile."""
-
-    user_summary = build_user_summary()
+async def login(
+    payload: LoginRequest,
+    use_case: LoginUser = Depends(get_login_user_use_case),
+) -> LoginResponse:
+    """Authenticate user and return token pair."""
+    try:
+        result = await use_case.execute(
+            LoginUserRequest(
+                email=payload.email,
+                password=payload.password,
+            ),
+        )
+    except (InactiveUserError, InvalidCredentialsError) as exc:
+        _raise_unauthorized(str(exc))
 
     return LoginResponse(
-        access_token=MOCK_ACCESS_TOKEN,
-        refresh_token=MOCK_REFRESH_TOKEN,
-        token_type="Bearer",
-        expires_in=3600,
+        access_token=result.access_token,
+        refresh_token=result.refresh_token,
+        token_type=result.token_type,
+        expires_in=result.expires_in,
         user=UserSummaryResponse(
-            id=user_summary["id"],
-            email=user_summary["email"],
-            display_name=user_summary["display_name"],
+            id=result.user.id,
+            email=result.user.email,
+            display_name=result.user.display_name,
         ),
     )
 
@@ -49,14 +78,23 @@ async def login(payload: LoginRequest) -> LoginResponse:
     status_code=status.HTTP_200_OK,
     summary="Обновление токена",
 )
-async def refresh(payload: RefreshTokenRequest) -> RefreshTokenResponse:
-    """Return a stable mocked refresh response."""
+async def refresh(
+    payload: RefreshTokenRequest,
+    use_case: RefreshSession = Depends(get_refresh_session_use_case),
+) -> RefreshTokenResponse:
+    """Rotate refresh token and return a new token pair."""
+    try:
+        result = await use_case.execute(
+            RefreshSessionRequest(refresh_token=payload.refresh_token),
+        )
+    except (InactiveUserError, InvalidRefreshTokenError) as exc:
+        _raise_unauthorized(str(exc))
 
     return RefreshTokenResponse(
-        access_token=MOCK_ACCESS_TOKEN,
-        refresh_token=payload.refresh_token or MOCK_REFRESH_TOKEN,
-        token_type="Bearer",
-        expires_in=3600,
+        access_token=result.access_token,
+        refresh_token=result.refresh_token,
+        token_type=result.token_type,
+        expires_in=result.expires_in,
     )
 
 
@@ -65,8 +103,17 @@ async def refresh(payload: RefreshTokenRequest) -> RefreshTokenResponse:
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Завершение сессии",
 )
-async def logout(payload: LogoutRequest) -> Response:
-    """Acknowledge logout without body."""
+async def logout(
+    payload: LogoutRequest,
+    use_case: LogoutUser = Depends(get_logout_user_use_case),
+) -> Response:
+    """Invalidate refresh token without response body."""
+    try:
+        await use_case.execute(
+            LogoutUserRequest(refresh_token=payload.refresh_token),
+        )
+    except InvalidRefreshTokenError as exc:
+        _raise_unauthorized(str(exc))
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -78,10 +125,9 @@ async def logout(payload: LogoutRequest) -> Response:
     summary="Текущий пользователь",
 )
 async def me(
-    principal: MockPrincipal = Depends(get_current_principal),
+    principal: AuthenticatedPrincipal = Depends(get_current_principal),
 ) -> UserSummaryResponse:
-    """Return the authenticated mock principal."""
-
+    """Return authenticated principal summary."""
     return UserSummaryResponse(
         id=principal.user_id,
         email=principal.email,
