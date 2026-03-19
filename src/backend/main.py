@@ -8,6 +8,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from redis.asyncio import Redis
 
 from config import settings
+from shared.presentation.api.router import api_router
 
 
 @asynccontextmanager
@@ -44,7 +45,6 @@ app = FastAPI(
     description="Сервис для автоматической справочной системы на основе языковых моделей для выбранного научного направления",
     version="0.0.0",
     debug=settings.debug,
-    root_path="/api/v1",
     lifespan=lifespan,
 )
 
@@ -52,6 +52,7 @@ app = FastAPI(
 Instrumentator().instrument(app).expose(app)
 
 # Подключение маршрутов
+app.include_router(api_router)
 
 
 @app.get("/health")
