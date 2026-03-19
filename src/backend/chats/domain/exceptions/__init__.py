@@ -1,0 +1,1 @@
+"""Chats domain exceptions."""

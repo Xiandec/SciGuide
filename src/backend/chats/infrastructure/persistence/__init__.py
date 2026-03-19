@@ -1,0 +1,1 @@
+"""Chats persistence adapters."""

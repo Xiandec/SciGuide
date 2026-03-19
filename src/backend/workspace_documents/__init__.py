@@ -1,0 +1,1 @@
+"""Workspace documents bounded context."""

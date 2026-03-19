@@ -1,0 +1,1 @@
+"""Workspace documents application layer."""
