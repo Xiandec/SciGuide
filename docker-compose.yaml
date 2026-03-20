@@ -26,6 +26,42 @@ services:
     networks:
       - sciguide-network
 
+  # Redis для refresh токенов и кэша
+  redis:
+    image: redis:7-alpine
+    container_name: sciguide-redis
+    restart: unless-stopped
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: >
+      sh -c '
+      if [ -n "$$REDIS_PASSWORD" ]; then
+        exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else
+        exec redis-server --appendonly yes;
+      fi
+      '
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - sciguide-network
+
   # Flyway миграции
   flyway:
     image: flyway/flyway:11
@@ -64,6 +100,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       flyway:
         condition: service_completed_successfully
     networks:
@@ -82,6 +120,7 @@ services:
 
 volumes:
   db_data:
+  redis_data:
 
 networks:
   sciguide-network:

@@ -116,7 +116,33 @@ API должно быть:
 
 4. Auth API
 
-4.1. Вход
+4.1. Регистрация
+
+POST /api/v1/auth/register
+
+Request
+
+{
+  "email": "user@example.com",
+  "display_name": "Ivan Petrov",
+  "password": "secret123"
+}
+
+Response 201
+
+{
+  "access_token": "<jwt>",
+  "refresh_token": "<refresh-token>",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user": {
+    "id": "2f3c5a89-4d55-4c34-98d8-95dbe6c50c31",
+    "email": "user@example.com",
+    "display_name": "Ivan Petrov"
+  }
+}
+
+4.2. Вход
 
 POST /api/v1/auth/login
 
@@ -141,7 +167,7 @@ Response 200
   }
 }
 
-4.2. Обновление токена
+4.3. Обновление токена
 
 POST /api/v1/auth/refresh
 
@@ -160,7 +186,7 @@ Response 200
   "expires_in": 3600
 }
 
-4.3. Завершение сессии
+4.4. Завершение сессии
 
 POST /api/v1/auth/logout
 
@@ -172,7 +198,7 @@ Request
 
 Response 204
 
-4.4. Текущий пользователь
+4.5. Текущий пользователь
 
 GET /api/v1/auth/me
 

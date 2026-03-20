@@ -38,3 +38,17 @@ class UnauthorizedError(AuthDomainError):
 
     def __init__(self) -> None:
         super().__init__("Authentication is required")
+
+
+class UserAlreadyExistsError(AuthDomainError):
+    """Raised when user email is already registered."""
+
+    def __init__(self, email: str) -> None:
+        super().__init__(f"User with email {email} already exists")
+
+
+class WeakPasswordError(AuthDomainError):
+    """Raised when password does not satisfy policy."""
+
+    def __init__(self) -> None:
+        super().__init__("Password must contain at least 8 characters")

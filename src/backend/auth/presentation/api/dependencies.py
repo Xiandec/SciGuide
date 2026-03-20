@@ -13,6 +13,7 @@ from auth.application.use_cases.get_authenticated_user import (
 )
 from auth.application.use_cases.login_user import LoginUser
 from auth.application.use_cases.logout_user import LogoutUser
+from auth.application.use_cases.register_user import RegisterUser
 from auth.application.use_cases.refresh_session import RefreshSession
 from auth.domain.repositories.auth_user_repository import AuthUserRepository
 from auth.domain.repositories.refresh_token_store import RefreshTokenStore
@@ -79,6 +80,23 @@ def get_login_user_use_case(
 ) -> LoginUser:
     """Build login use case."""
     return LoginUser(
+        user_repository=user_repository,
+        refresh_token_store=refresh_token_store,
+        password_hasher=password_hasher,
+        token_service=token_service,
+        access_token_ttl_seconds=settings.access_token_expire_minutes * 60,
+        refresh_token_ttl_seconds=settings.refresh_token_expire_days * 86400,
+    )
+
+
+def get_register_user_use_case(
+    user_repository: AuthUserRepository = Depends(get_auth_user_repository),
+    refresh_token_store: RefreshTokenStore = Depends(get_refresh_token_store),
+    password_hasher: PasswordHasher = Depends(get_password_hasher),
+    token_service: TokenService = Depends(get_token_service),
+) -> RegisterUser:
+    """Build registration use case."""
+    return RegisterUser(
         user_repository=user_repository,
         refresh_token_store=refresh_token_store,
         password_hasher=password_hasher,

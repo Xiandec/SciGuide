@@ -6,6 +6,8 @@ from auth.domain.exceptions.auth_exceptions import InvalidAccessTokenError
 from auth.domain.exceptions.auth_exceptions import InvalidCredentialsError
 from auth.domain.exceptions.auth_exceptions import InvalidRefreshTokenError
 from auth.domain.exceptions.auth_exceptions import UnauthorizedError
+from auth.domain.exceptions.auth_exceptions import UserAlreadyExistsError
+from auth.domain.exceptions.auth_exceptions import WeakPasswordError
 
 __all__ = [
     "AuthDomainError",
@@ -14,4 +16,6 @@ __all__ = [
     "InvalidCredentialsError",
     "InvalidRefreshTokenError",
     "UnauthorizedError",
+    "UserAlreadyExistsError",
+    "WeakPasswordError",
 ]

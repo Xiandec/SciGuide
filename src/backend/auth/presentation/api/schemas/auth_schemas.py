@@ -1,4 +1,4 @@
-"""Schemas for mock authentication API."""
+"""Schemas for authentication API."""
 
 from __future__ import annotations
 
@@ -29,6 +29,24 @@ class LoginRequest(BaseModel):
 
     email: EmailStr
     password: str = Field(..., min_length=1, max_length=255)
+
+
+class RegisterRequest(BaseModel):
+    """Payload for new user registration."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "email": "user@example.com",
+                "display_name": "Ivan Petrov",
+                "password": "secret123",
+            },
+        },
+    )
+
+    email: EmailStr
+    display_name: str = Field(..., min_length=1, max_length=255)
+    password: str = Field(..., min_length=8, max_length=255)
 
 
 class RefreshTokenRequest(BaseModel):
@@ -68,3 +86,7 @@ class LoginResponse(RefreshTokenResponse):
     """Login response including current user projection."""
 
     user: UserSummaryResponse
+
+
+class RegisterResponse(LoginResponse):
+    """Registration response including current user projection."""

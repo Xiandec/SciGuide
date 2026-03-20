@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from asyncpg import UniqueViolationError
 from asyncpg import Pool, Record
 
 from auth.domain.entities.auth_user import AuthUser
+from auth.domain.exceptions.auth_exceptions import UserAlreadyExistsError
 from auth.domain.repositories.auth_user_repository import AuthUserRepository
 
 
@@ -15,6 +17,61 @@ class PostgresAuthUserRepository(AuthUserRepository):
 
     def __init__(self, pool: Pool) -> None:
         self._pool = pool
+
+    async def create(self, user: AuthUser) -> AuthUser:
+        """Create a new user row."""
+        try:
+            record = await self._pool.fetchrow(
+                """
+                INSERT INTO users (
+                    id,
+                    email,
+                    password_hash,
+                    display_name,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING
+                    id,
+                    email,
+                    display_name,
+                    password_hash,
+                    is_active,
+                    created_at,
+                    updated_at
+                """,
+                user.id,
+                user.email,
+                user.password_hash,
+                user.display_name,
+                user.is_active,
+                user.created_at,
+                user.updated_at,
+            )
+        except UniqueViolationError as exc:
+            raise UserAlreadyExistsError(user.email) from exc
+
+        created_user = self._build_user(record)
+        if created_user is None:
+            raise RuntimeError("Failed to create user")
+
+        return created_user
+
+    async def exists_by_email(self, email: str) -> bool:
+        """Return whether a user with email already exists."""
+        exists = await self._pool.fetchval(
+            """
+            SELECT EXISTS(
+                SELECT 1
+                FROM users
+                WHERE lower(email) = lower($1)
+            )
+            """,
+            email.strip(),
+        )
+        return bool(exists)
 
     async def get_by_email(self, email: str) -> AuthUser | None:
         """Return a user by normalized email."""
