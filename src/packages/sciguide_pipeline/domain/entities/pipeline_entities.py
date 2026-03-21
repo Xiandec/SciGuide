@@ -69,8 +69,8 @@ class SearchItem:
     metadata: dict[str, Any]
     vector_score: float
     graph_score: float
-    rerank_score: float
     final_score: float
+    graph_only: bool = False
 
 
 @dataclass(frozen=True)

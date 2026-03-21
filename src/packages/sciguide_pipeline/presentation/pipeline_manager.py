@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import Lock
 
 from ..application.dto import RunChunkingRequest, RunSearchRequest
 from ..application.use_cases import RunChunking, RunSearch
@@ -17,7 +18,6 @@ from ..infrastructure.processing import (
     DeterministicEntityExtractor,
     LangChainTextChunker,
 )
-from ..infrastructure.rerankers import HuggingFaceRerankerService
 
 
 class ChunkingPipeline:
@@ -54,19 +54,31 @@ class SearchPipeline:
         candidate_limit: int | None = None,
     ) -> SearchReport:
         """Run hybrid retrieval for a query."""
+        resolved_limit = max(limit or self._default_limit, 5)
+        resolved_candidate_limit = max(
+            candidate_limit or self._default_candidate_limit,
+            resolved_limit,
+        )
         return self._use_case.execute(
             RunSearchRequest(
                 query=query,
-                limit=limit or self._default_limit,
-                candidate_limit=(
-                    candidate_limit or self._default_candidate_limit
-                ),
+                limit=resolved_limit,
+                candidate_limit=resolved_candidate_limit,
             )
         )
 
 
 class PipelineManager:
     """Main developer-facing entrypoint for the SciGuide library."""
+
+    _runtime_lock = Lock()
+    _entity_extractor = DeterministicEntityExtractor()
+    _text_chunkers: dict[tuple[int, int], LangChainTextChunker] = {}
+    _embedding_services: dict[
+        tuple[str, str, str | None],
+        HuggingFaceEmbeddingService,
+    ] = {}
+    _ensured_graph_schemas: set[tuple[str, str, str]] = set()
 
     def __init__(
         self,
@@ -96,18 +108,13 @@ class PipelineManager:
         cache_dir = Path(model_cache_dir)
         resolved_graph_namespace = graph_namespace or qdrant_collection_name
 
-        self._entity_extractor = DeterministicEntityExtractor()
-        self._text_chunker = LangChainTextChunker(
+        self._entity_extractor = self.__class__._entity_extractor
+        self._text_chunker = self._get_or_create_text_chunker(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
         )
-        self._embedding_service = HuggingFaceEmbeddingService(
+        self._embedding_service = self._get_or_create_embedding_service(
             model_name=embedding_model_name,
-            cache_dir=cache_dir,
-            token=huggingface_token,
-        )
-        self._reranker_service = HuggingFaceRerankerService(
-            model_name=reranker_model_name,
             cache_dir=cache_dir,
             token=huggingface_token,
         )
@@ -136,7 +143,11 @@ class PipelineManager:
         self._vector_repository.ensure_collection(
             self._embedding_service.vector_size
         )
-        self._graph_repository.ensure_schema()
+        self._ensure_graph_schema_once(
+            uri=neo4j_uri,
+            username=neo4j_username,
+            database=neo4j_database,
+        )
 
         self._chunking_use_case = RunChunking(
             text_chunker=self._text_chunker,
@@ -150,7 +161,6 @@ class PipelineManager:
         self._search_use_case = RunSearch(
             entity_extractor=self._entity_extractor,
             embedding_service=self._embedding_service,
-            reranker_service=self._reranker_service,
             vector_repository=self._vector_repository,
             graph_repository=self._graph_repository,
             score_combiner=self._score_combiner,
@@ -173,3 +183,62 @@ class PipelineManager:
 
     def __exit__(self, exc_type, exc, traceback) -> None:
         self.close()
+
+    @classmethod
+    def _get_or_create_text_chunker(
+        cls,
+        *,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> LangChainTextChunker:
+        key = (chunk_size, chunk_overlap)
+        with cls._runtime_lock:
+            existing = cls._text_chunkers.get(key)
+            if existing is not None:
+                return existing
+
+            chunker = LangChainTextChunker(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+            cls._text_chunkers[key] = chunker
+            return chunker
+
+    @classmethod
+    def _get_or_create_embedding_service(
+        cls,
+        *,
+        model_name: str,
+        cache_dir: Path,
+        token: str | None,
+    ) -> HuggingFaceEmbeddingService:
+        key = (model_name, str(cache_dir.resolve()), token)
+        with cls._runtime_lock:
+            existing = cls._embedding_services.get(key)
+            if existing is not None:
+                return existing
+
+            service = HuggingFaceEmbeddingService(
+                model_name=model_name,
+                cache_dir=cache_dir,
+                token=token,
+            )
+            cls._embedding_services[key] = service
+            return service
+
+    def _ensure_graph_schema_once(
+        self,
+        *,
+        uri: str,
+        username: str,
+        database: str,
+    ) -> None:
+        key = (uri, username, database)
+        with self.__class__._runtime_lock:
+            if key in self.__class__._ensured_graph_schemas:
+                return
+
+        self._graph_repository.ensure_schema()
+
+        with self.__class__._runtime_lock:
+            self.__class__._ensured_graph_schemas.add(key)

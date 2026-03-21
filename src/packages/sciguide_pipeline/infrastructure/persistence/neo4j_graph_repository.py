@@ -8,7 +8,7 @@ import json
 import math
 from typing import Any
 
-from ...domain.entities import TextChunk
+from ...domain.entities import TextChunk, VectorSearchMatch
 from ...domain.exceptions import MissingDependencyError
 from ...domain.repositories import GraphRepository
 from ..processing.deterministic_entity_extractor import (
@@ -98,14 +98,22 @@ class Neo4jGraphRepository(GraphRepository):
             return {chunk_id: 0.0 for chunk_id in chunk_ids}
 
         with self._driver.session(database=self._database) as session:
-            entity_scores = self._build_query_entity_scores(
+            resolved_entities = self._resolve_query_entities(
                 session=session,
                 query_entities=unique_query_entities,
                 query_tokens=unique_query_tokens,
             )
-            if not entity_scores:
+            if not resolved_entities:
                 return {chunk_id: 0.0 for chunk_id in chunk_ids}
 
+            expanded_entities = self._expand_entities(
+                session=session,
+                resolved_entities=resolved_entities,
+            )
+            entity_scores = self._build_entity_scores(
+                resolved_entities=resolved_entities,
+                expanded_entities=expanded_entities,
+            )
             chunk_entities = self._fetch_chunk_entities(
                 session=session,
                 chunk_ids=chunk_ids,
@@ -126,6 +134,86 @@ class Neo4jGraphRepository(GraphRepository):
             scores[chunk_id] = sum(matched_scores) + (0.15 * len(matched_scores))
 
         return scores
+
+    def find_graph_only_matches(
+        self,
+        query_entities: Sequence[str],
+        query_tokens: Sequence[str],
+        exclude_chunk_ids: Sequence[str],
+        limit: int,
+    ) -> list[VectorSearchMatch]:
+        """Return graph-expanded candidates that were absent in vector search."""
+        if limit <= 0:
+            return []
+
+        with self._driver.session(database=self._database) as session:
+            resolved_entities = self._resolve_query_entities(
+                session=session,
+                query_entities=list(dict.fromkeys(query_entities)),
+                query_tokens=list(dict.fromkeys(query_tokens)),
+            )
+            if not resolved_entities:
+                return []
+
+            expanded_entities = self._expand_entities(
+                session=session,
+                resolved_entities=resolved_entities,
+            )
+            entity_scores = self._build_entity_scores(
+                resolved_entities=resolved_entities,
+                expanded_entities=expanded_entities,
+            )
+            if not entity_scores:
+                return []
+
+            records = session.run(
+                """
+                MATCH (chunk:Chunk {namespace: $namespace})-[:MENTIONS]->
+                      (entity:Entity {namespace: $namespace})
+                WHERE entity.name IN $entity_names
+                  AND NOT chunk.chunk_id IN $exclude_chunk_ids
+                WITH chunk, collect(DISTINCT entity.name) AS matched_entities
+                RETURN chunk.chunk_id AS chunk_id,
+                       chunk.document_id AS document_id,
+                       chunk.text AS text,
+                       chunk.metadata_json AS metadata_json,
+                       matched_entities
+                """,
+                namespace=self._namespace,
+                entity_names=list(entity_scores),
+                exclude_chunk_ids=list(exclude_chunk_ids),
+            )
+
+            ranked_matches: list[tuple[float, VectorSearchMatch]] = []
+            for record in records:
+                matched_entities = list(record["matched_entities"] or [])
+                score = sum(
+                    entity_scores.get(entity_name, 0.0)
+                    for entity_name in matched_entities
+                )
+                if score <= 0.0:
+                    continue
+                payload = {
+                    "chunk_id": str(record["chunk_id"]),
+                    "document_id": str(record["document_id"] or ""),
+                    "text": str(record["text"] or ""),
+                    "metadata": self._deserialize_mapping(
+                        record["metadata_json"]
+                    ),
+                }
+                ranked_matches.append(
+                    (
+                        score,
+                        VectorSearchMatch(
+                            chunk_id=str(record["chunk_id"]),
+                            score=score,
+                            payload=payload,
+                        ),
+                    )
+                )
+
+        ranked_matches.sort(key=lambda item: item[0], reverse=True)
+        return [match for _, match in ranked_matches[:limit]]
 
     def close(self) -> None:
         """Close the Neo4j driver."""
@@ -395,19 +483,19 @@ class Neo4jGraphRepository(GraphRepository):
             namespace=namespace,
         )
 
-    def _build_query_entity_scores(
+    def _resolve_query_entities(
         self,
         *,
         session: Any,
         query_entities: Sequence[str],
         query_tokens: Sequence[str],
     ) -> dict[str, float]:
-        entity_scores: dict[str, float] = {}
+        resolved_entities: dict[str, float] = {}
 
         for entity_name in query_entities:
-            entity_scores[entity_name] = max(
-                entity_scores.get(entity_name, 0.0),
-                2.0,
+            resolved_entities[entity_name] = max(
+                resolved_entities.get(entity_name, 0.0),
+                3.0,
             )
 
         if query_tokens:
@@ -433,39 +521,64 @@ class Neo4jGraphRepository(GraphRepository):
                 if not entity_tokens or not matched_tokens:
                     continue
                 overlap_ratio = len(matched_tokens) / len(entity_tokens)
-                entity_scores[entity_name] = max(
-                    entity_scores.get(entity_name, 0.0),
-                    0.75 + overlap_ratio,
+                resolved_entities[entity_name] = max(
+                    resolved_entities.get(entity_name, 0.0),
+                    1.5 + overlap_ratio,
                 )
 
-        seed_entities = list(entity_scores)
-        if seed_entities:
-            neighbor_matches = session.run(
-                """
-                UNWIND $seed_entities AS seed_entity
-                MATCH (seed:Entity {
-                    namespace: $namespace,
-                    name: seed_entity
-                })
-                MATCH (seed)-[relation:PRECEDES {
-                    namespace: $namespace
-                }]-(neighbor:Entity {namespace: $namespace})
-                RETURN neighbor.name AS entity_name,
-                       sum(relation.weight) AS total_weight
-                """,
-                namespace=self._namespace,
-                seed_entities=seed_entities,
+        return resolved_entities
+
+    def _expand_entities(
+        self,
+        *,
+        session: Any,
+        resolved_entities: dict[str, float],
+    ) -> dict[str, float]:
+        if not resolved_entities:
+            return {}
+
+        expanded_entities: dict[str, float] = {}
+        neighbor_matches = session.run(
+            """
+            UNWIND $seed_entities AS seed_entity
+            MATCH (seed:Entity {
+                namespace: $namespace,
+                name: seed_entity
+            })
+            MATCH (seed)-[relation:PRECEDES {
+                namespace: $namespace
+            }]-(neighbor:Entity {namespace: $namespace})
+            RETURN neighbor.name AS entity_name,
+                   sum(relation.weight) AS total_weight
+            """,
+            namespace=self._namespace,
+            seed_entities=list(resolved_entities),
+        )
+        for record in neighbor_matches:
+            entity_name = str(record["entity_name"])
+            if entity_name in resolved_entities:
+                continue
+            total_weight = float(record["total_weight"] or 0.0)
+            if total_weight <= 0.0:
+                continue
+            expanded_entities[entity_name] = max(
+                expanded_entities.get(entity_name, 0.0),
+                min(math.log1p(total_weight), 2.0),
             )
-            for record in neighbor_matches:
-                entity_name = str(record["entity_name"])
-                total_weight = float(record["total_weight"] or 0.0)
-                if total_weight <= 0.0:
-                    continue
-                entity_scores[entity_name] = (
-                    entity_scores.get(entity_name, 0.0)
-                    + min(math.log1p(total_weight), 2.0) * 0.35
-                )
+        return expanded_entities
 
+    @staticmethod
+    def _build_entity_scores(
+        *,
+        resolved_entities: dict[str, float],
+        expanded_entities: dict[str, float],
+    ) -> dict[str, float]:
+        entity_scores = dict(resolved_entities)
+        for entity_name, weight in expanded_entities.items():
+            entity_scores[entity_name] = max(
+                entity_scores.get(entity_name, 0.0),
+                0.75 + (weight * 0.5),
+            )
         return entity_scores
 
     def _fetch_chunk_entities(
@@ -584,3 +697,15 @@ class Neo4jGraphRepository(GraphRepository):
             ensure_ascii=False,
             sort_keys=True,
         )
+
+    @staticmethod
+    def _deserialize_mapping(payload: str | None) -> dict[str, Any]:
+        if not payload:
+            return {}
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            return {}
+        if isinstance(parsed, dict):
+            return parsed
+        return {}

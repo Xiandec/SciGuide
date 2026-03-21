@@ -8,7 +8,6 @@ from ...domain.repositories import GraphRepository, VectorRepository
 from ...domain.services import (
     EmbeddingService,
     EntityExtractor,
-    RerankerService,
     WeightedScoreCombiner,
 )
 
@@ -20,14 +19,12 @@ class RunSearch:
         self,
         entity_extractor: EntityExtractor,
         embedding_service: EmbeddingService,
-        reranker_service: RerankerService,
         vector_repository: VectorRepository,
         graph_repository: GraphRepository,
         score_combiner: WeightedScoreCombiner,
     ) -> None:
         self._entity_extractor = entity_extractor
         self._embedding_service = embedding_service
-        self._reranker_service = reranker_service
         self._vector_repository = vector_repository
         self._graph_repository = graph_repository
         self._score_combiner = score_combiner
@@ -39,12 +36,6 @@ class RunSearch:
             query_vector=query_vector,
             limit=request.candidate_limit,
         )
-        if not vector_candidates:
-            return SearchReport(
-                query=request.query,
-                items=(),
-                candidate_count=0,
-            )
 
         query_entities = self._entity_extractor.extract(request.query)
         query_tokens = self._entity_extractor.extract_tokens(request.query)
@@ -54,30 +45,40 @@ class RunSearch:
             query_tokens=query_tokens,
             chunk_ids=chunk_ids,
         )
-
-        texts = [
-            str(candidate.payload.get("text", ""))
-            for candidate in vector_candidates
-        ]
-        rerank_values = self._reranker_service.rerank(request.query, texts)
+        graph_only_candidates = self._graph_repository.find_graph_only_matches(
+            query_entities=query_entities,
+            query_tokens=query_tokens,
+            exclude_chunk_ids=chunk_ids,
+            limit=request.limit,
+        )
 
         vector_scores = {
             candidate.chunk_id: candidate.score
             for candidate in vector_candidates
         }
-        rerank_scores = {
-            candidate.chunk_id: score
-            for candidate, score in zip(
-                vector_candidates,
-                rerank_values,
-                strict=False,
-            )
-        }
+        for candidate in graph_only_candidates:
+            vector_scores.setdefault(candidate.chunk_id, 0.0)
+            graph_scores[candidate.chunk_id] = candidate.score
+
         combined_scores = self._score_combiner.combine(
             vector_scores=vector_scores,
             graph_scores=graph_scores,
-            rerank_scores=rerank_scores,
+            rerank_scores=None,
         )
+
+        all_candidates = {
+            candidate.chunk_id: candidate
+            for candidate in vector_candidates
+        }
+        for candidate in graph_only_candidates:
+            all_candidates.setdefault(candidate.chunk_id, candidate)
+
+        if not all_candidates:
+            return SearchReport(
+                query=request.query,
+                items=(),
+                candidate_count=0,
+            )
 
         items = [
             SearchItem(
@@ -89,10 +90,10 @@ class RunSearch:
                 metadata=dict(candidate.payload.get("metadata", {})),
                 vector_score=vector_scores.get(candidate.chunk_id, 0.0),
                 graph_score=graph_scores.get(candidate.chunk_id, 0.0),
-                rerank_score=rerank_scores.get(candidate.chunk_id, 0.0),
                 final_score=combined_scores.get(candidate.chunk_id, 0.0),
+                graph_only=candidate.chunk_id not in chunk_ids,
             )
-            for candidate in vector_candidates
+            for candidate in all_candidates.values()
         ]
         ranked_items = tuple(
             sorted(
@@ -105,5 +106,5 @@ class RunSearch:
         return SearchReport(
             query=request.query,
             items=ranked_items,
-            candidate_count=len(vector_candidates),
+            candidate_count=len(all_candidates),
         )

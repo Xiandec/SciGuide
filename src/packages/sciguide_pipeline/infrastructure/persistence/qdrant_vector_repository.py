@@ -7,6 +7,7 @@ from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
 from ...domain.entities import TextChunk, VectorSearchMatch
+from ...domain.exceptions import PipelineInitializationError
 from ...domain.exceptions import MissingDependencyError
 from ...domain.repositories import VectorRepository
 
@@ -47,6 +48,7 @@ class QdrantVectorRepository(VectorRepository):
         from qdrant_client.models import Distance, VectorParams
 
         if self._client.collection_exists(self._collection_name):
+            self._ensure_existing_collection_matches(vector_size)
             return
 
         self._client.create_collection(
@@ -92,12 +94,14 @@ class QdrantVectorRepository(VectorRepository):
         limit: int,
     ) -> list[VectorSearchMatch]:
         """Search the collection for nearest chunks."""
-        results = self._client.search(
+        query_result = self._client.query_points(
             collection_name=self._collection_name,
-            query_vector=list(query_vector),
+            query=list(query_vector),
             limit=limit,
             with_payload=True,
         )
+        results = list(getattr(query_result, "points", []) or [])
+
         return [
             VectorSearchMatch(
                 chunk_id=str(
@@ -136,3 +140,51 @@ class QdrantVectorRepository(VectorRepository):
     @staticmethod
     def _make_point_id(chunk_id: str) -> str:
         return str(uuid5(NAMESPACE_URL, f"sciguide:{chunk_id}"))
+
+    def _ensure_existing_collection_matches(
+        self,
+        vector_size: int,
+    ) -> None:
+        collection_info = self._client.get_collection(self._collection_name)
+        actual_size = self._extract_vector_size(collection_info)
+        if actual_size is None or actual_size == vector_size:
+            return
+
+        points_count = self._extract_points_count(collection_info)
+        if points_count == 0:
+            self._client.delete_collection(self._collection_name)
+            self.ensure_collection(vector_size)
+            return
+
+        raise PipelineInitializationError(
+            "Qdrant collection vector size mismatch: "
+            f"collection '{self._collection_name}' uses size "
+            f"{actual_size}, but the embedding model produces {vector_size}. "
+            "Recreate the collection or align the configured embedding model."
+        )
+
+    @staticmethod
+    def _extract_vector_size(collection_info: Any) -> int | None:
+        config = getattr(collection_info, "config", None)
+        params = getattr(config, "params", None)
+        vectors = getattr(params, "vectors", None)
+
+        size = getattr(vectors, "size", None)
+        if isinstance(size, int):
+            return size
+
+        if isinstance(vectors, dict):
+            first_vector = next(iter(vectors.values()), None)
+            named_size = getattr(first_vector, "size", None)
+            if isinstance(named_size, int):
+                return named_size
+
+        return None
+
+    @staticmethod
+    def _extract_points_count(collection_info: Any) -> int:
+        for attribute_name in ("points_count", "vectors_count"):
+            value = getattr(collection_info, attribute_name, None)
+            if isinstance(value, int):
+                return value
+        return 0

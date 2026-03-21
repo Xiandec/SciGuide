@@ -34,8 +34,8 @@ class OpenRouterAssistantResponder(AssistantResponder):
         model_name: str,
         base_url: str,
         request_timeout_seconds: float,
-        search_limit: int = 3,
-        candidate_limit: int = 10,
+        search_limit: int = 5,
+        candidate_limit: int = 20,
         history_limit: int = 12,
     ) -> None:
         self._api_key = api_key.strip()
@@ -128,8 +128,11 @@ class OpenRouterAssistantResponder(AssistantResponder):
                     limit=self._search_limit,
                     candidate_limit=self._candidate_limit,
                 )
-        except Exception:
-            return [], []
+        except Exception as exc:
+            raise MessageGenerationError(
+                "Workspace retrieval failed. Check pipeline indexing and "
+                "vector collection configuration."
+            ) from exc
 
         documents_by_id: OrderedDict[str, MessageContextDocument] = (
             OrderedDict()
