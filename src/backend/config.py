@@ -47,5 +47,51 @@ class Settings(BaseSettings):
         validation_alias="REDIS_PASSWORD",
     )
 
+    # Workspace lifecycle integrations
+    workspace_lifecycle_mode: str = Field(
+        default="noop",
+        validation_alias="WORKSPACE_LIFECYCLE_MODE",
+    )
+    workspace_lifecycle_timeout_seconds: float = Field(
+        default=10.0,
+        validation_alias="WORKSPACE_LIFECYCLE_TIMEOUT_SECONDS",
+    )
+    qdrant_url: str = Field(
+        default="http://qdrant:6333",
+        validation_alias="QDRANT_URL",
+    )
+    qdrant_collection_prefix: str = Field(
+        default="workspace_",
+        validation_alias="QDRANT_COLLECTION_PREFIX",
+    )
+    qdrant_vector_size: int = Field(
+        default=1536,
+        validation_alias="QDRANT_VECTOR_SIZE",
+    )
+    qdrant_distance: str = Field(
+        default="Cosine",
+        validation_alias="QDRANT_DISTANCE",
+    )
+    neo4j_url: str = Field(
+        default="http://neo4j:7474",
+        validation_alias="NEO4J_URL",
+    )
+    neo4j_username: str = Field(
+        default="neo4j",
+        validation_alias="NEO4J_USERNAME",
+    )
+    neo4j_password: str = Field(
+        default="neo4j",
+        validation_alias="NEO4J_PASSWORD",
+    )
+    neo4j_database: str = Field(
+        default="neo4j",
+        validation_alias="NEO4J_DATABASE",
+    )
+    neo4j_workspace_root_label: str = Field(
+        default="WorkspaceGraphRoot",
+        validation_alias="NEO4J_WORKSPACE_ROOT_LABEL",
+    )
+
 
 settings = Settings()

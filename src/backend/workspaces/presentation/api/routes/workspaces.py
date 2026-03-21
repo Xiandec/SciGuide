@@ -1,17 +1,61 @@
-"""Mock workspace routes."""
+"""Workspace routes."""
 
 from __future__ import annotations
 
 from typing import Annotated
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
+from fastapi import status
 
+from shared.presentation.api.dependencies.security import (
+    AuthenticatedPrincipal,
+)
 from shared.presentation.api.dependencies.security import get_current_principal
-from shared.presentation.api.mock_data import BASE_TIME
-from shared.presentation.api.mock_data import MOCK_CREATED_WORKSPACE_ID
-from shared.presentation.api.mock_data import build_workspace
 from shared.presentation.api.schemas.common import CursorPage
+from workspaces.application.use_cases.create_workspace import CreateWorkspace
+from workspaces.application.use_cases.create_workspace import (
+    CreateWorkspaceRequest as CreateWorkspaceCommand,
+)
+from workspaces.application.use_cases.delete_workspace import DeleteWorkspace
+from workspaces.application.use_cases.delete_workspace import (
+    DeleteWorkspaceRequest,
+)
+from workspaces.application.use_cases.get_workspace import GetWorkspace
+from workspaces.application.use_cases.get_workspace import GetWorkspaceRequest
+from workspaces.application.use_cases.list_workspaces import ListWorkspaces
+from workspaces.application.use_cases.list_workspaces import (
+    ListWorkspacesRequest,
+)
+from workspaces.application.use_cases.update_workspace import UpdateWorkspace
+from workspaces.application.use_cases.update_workspace import (
+    UpdateWorkspaceRequest as UpdateWorkspaceCommand,
+)
+from workspaces.domain.exceptions.workspace_exceptions import (
+    WorkspaceAccessDeniedError,
+)
+from workspaces.domain.exceptions.workspace_exceptions import (
+    WorkspaceLifecycleError,
+)
+from workspaces.domain.exceptions.workspace_exceptions import (
+    WorkspaceNotFoundError,
+)
+from workspaces.presentation.api.dependencies import (
+    get_create_workspace_use_case,
+)
+from workspaces.presentation.api.dependencies import (
+    get_delete_workspace_use_case,
+)
+from workspaces.presentation.api.dependencies import (
+    get_get_workspace_use_case,
+)
+from workspaces.presentation.api.dependencies import (
+    get_list_workspaces_use_case,
+)
+from workspaces.presentation.api.dependencies import (
+    get_update_workspace_use_case,
+)
 from workspaces.presentation.api.schemas.workspace_schemas import (
     CreateWorkspaceRequest,
 )
@@ -24,11 +68,11 @@ from workspaces.presentation.api.schemas.workspace_schemas import (
 from workspaces.presentation.api.schemas.workspace_schemas import (
     WorkspaceResponse,
 )
+from workspaces.presentation.api.schemas.workspace_schemas import WorkspaceType
 
 router = APIRouter(
     prefix="/workspaces",
     tags=["Workspaces"],
-    dependencies=[Depends(get_current_principal)],
 )
 
 
@@ -39,54 +83,54 @@ router = APIRouter(
     summary="Список доступных воркспейсов",
 )
 async def list_workspaces(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Depends(get_current_principal),
+    ],
+    use_case: Annotated[
+        ListWorkspaces,
+        Depends(get_list_workspaces_use_case),
+    ],
     workspace_type: Annotated[
-        str | None,
+        WorkspaceType | None,
         Query(alias="type"),
     ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     cursor: Annotated[str | None, Query()] = None,
-    sort: Annotated[str, Query()] = "-created_at",
+    sort: Annotated[
+        Literal["-created_at", "created_at"],
+        Query(),
+    ] = "-created_at",
 ) -> WorkspaceListResponse:
-    """Return a mocked workspace collection."""
-
-    workspace_one = build_workspace()
-    workspace_two = build_workspace(
-        workspace_id=MOCK_CREATED_WORKSPACE_ID,
-        name="Graph Retrieval",
-        description="Workspace for graph-guided retrieval experiments",
-        workspace_type="shared",
-        access_mode="by_membership",
+    """Return accessible workspaces."""
+    payload = await use_case.execute(
+        ListWorkspacesRequest(
+            user_id=principal.user_id,
+            workspace_type=workspace_type,
+            limit=limit,
+            cursor=cursor,
+            sort=sort,
+        ),
     )
 
-    items = [
-        WorkspaceResponse(
-            id=workspace_one["id"],
-            name=workspace_one["name"],
-            description=workspace_one["description"],
-            type=workspace_one["type"],
-            access_mode=workspace_one["access_mode"],
-            my_role=workspace_one["my_role"],
-            created_at=workspace_one["created_at"],
-            updated_at=workspace_one["updated_at"],
-        ),
-        WorkspaceResponse(
-            id=workspace_two["id"],
-            name=workspace_two["name"],
-            description=workspace_two["description"],
-            type=workspace_two["type"],
-            access_mode=workspace_two["access_mode"],
-            my_role=workspace_two["my_role"],
-            created_at=workspace_two["created_at"],
-            updated_at=workspace_two["updated_at"],
-        ),
-    ]
-
-    if workspace_type is not None:
-        items = [item for item in items if item.type.value == workspace_type]
-
     return WorkspaceListResponse(
-        items=items[:limit],
-        page=CursorPage(next_cursor=cursor, has_more=False),
+        items=[
+            WorkspaceResponse(
+                id=item.id,
+                name=item.name,
+                description=item.description,
+                type=item.type,
+                access_mode=item.access_mode,
+                my_role=item.my_role,
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+            )
+            for item in payload.items
+        ],
+        page=CursorPage(
+            next_cursor=payload.next_cursor,
+            has_more=payload.has_more,
+        ),
     )
 
 
@@ -97,29 +141,47 @@ async def list_workspaces(
     summary="Создание воркспейса",
 )
 async def create_workspace(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Depends(get_current_principal),
+    ],
+    use_case: Annotated[
+        CreateWorkspace,
+        Depends(get_create_workspace_use_case),
+    ],
     payload: CreateWorkspaceRequest,
 ) -> WorkspaceResponse:
-    """Return a mocked created workspace."""
-
-    workspace_payload = build_workspace(
-        workspace_id=MOCK_CREATED_WORKSPACE_ID,
-        name=payload.name,
-        description=payload.description,
-        workspace_type=payload.type.value,
-        access_mode=payload.access_mode.value,
-        created_at=BASE_TIME,
-        updated_at=BASE_TIME,
-    )
+    """Create a workspace."""
+    try:
+        workspace = await use_case.execute(
+            CreateWorkspaceCommand(
+                owner_user_id=principal.user_id,
+                name=payload.name,
+                description=payload.description,
+                workspace_type=payload.type,
+                access_mode=payload.access_mode,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except WorkspaceLifecycleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
     return WorkspaceResponse(
-        id=workspace_payload["id"],
-        name=workspace_payload["name"],
-        description=workspace_payload["description"],
-        type=workspace_payload["type"],
-        access_mode=workspace_payload["access_mode"],
-        my_role=workspace_payload["my_role"],
-        created_at=workspace_payload["created_at"],
-        updated_at=workspace_payload["updated_at"],
+        id=workspace.id,
+        name=workspace.name,
+        description=workspace.description,
+        type=workspace.type,
+        access_mode=workspace.access_mode,
+        my_role=workspace.my_role,
+        created_at=workspace.created_at,
+        updated_at=workspace.updated_at,
     )
 
 
@@ -130,29 +192,39 @@ async def create_workspace(
     summary="Получение воркспейса",
 )
 async def get_workspace(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Depends(get_current_principal),
+    ],
+    use_case: Annotated[
+        GetWorkspace,
+        Depends(get_get_workspace_use_case),
+    ],
     workspace_id: Annotated[UUID, Path()],
 ) -> WorkspaceResponse:
-    """Return a mocked workspace by id."""
-
-    workspace_payload = build_workspace(
-        workspace_id=workspace_id,
-        workspace_type="shared"
-        if workspace_id == MOCK_CREATED_WORKSPACE_ID
-        else "private",
-        access_mode="by_membership"
-        if workspace_id == MOCK_CREATED_WORKSPACE_ID
-        else "owner_only",
-    )
+    """Return workspace details."""
+    try:
+        workspace = await use_case.execute(
+            GetWorkspaceRequest(
+                workspace_id=workspace_id,
+                user_id=principal.user_id,
+            ),
+        )
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
     return WorkspaceResponse(
-        id=workspace_payload["id"],
-        name=workspace_payload["name"],
-        description=workspace_payload["description"],
-        type=workspace_payload["type"],
-        access_mode=workspace_payload["access_mode"],
-        my_role=workspace_payload["my_role"],
-        created_at=workspace_payload["created_at"],
-        updated_at=workspace_payload["updated_at"],
+        id=workspace.id,
+        name=workspace.name,
+        description=workspace.description,
+        type=workspace.type,
+        access_mode=workspace.access_mode,
+        my_role=workspace.my_role,
+        created_at=workspace.created_at,
+        updated_at=workspace.updated_at,
     )
 
 
@@ -163,26 +235,52 @@ async def get_workspace(
     summary="Обновление воркспейса",
 )
 async def update_workspace(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Depends(get_current_principal),
+    ],
+    use_case: Annotated[
+        UpdateWorkspace,
+        Depends(get_update_workspace_use_case),
+    ],
     workspace_id: Annotated[UUID, Path()],
     payload: UpdateWorkspaceRequest,
 ) -> WorkspaceResponse:
-    """Return a mocked updated workspace."""
-
-    base_workspace = build_workspace(workspace_id=workspace_id)
+    """Update workspace metadata."""
+    try:
+        workspace = await use_case.execute(
+            UpdateWorkspaceCommand(
+                workspace_id=workspace_id,
+                actor_user_id=principal.user_id,
+                name=payload.name,
+                description=payload.description,
+            ),
+        )
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkspaceAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
     return WorkspaceResponse(
-        id=base_workspace["id"],
-        name=payload.name or base_workspace["name"],
-        description=(
-            payload.description
-            if payload.description is not None
-            else base_workspace["description"]
-        ),
-        type=base_workspace["type"],
-        access_mode=base_workspace["access_mode"],
-        my_role=base_workspace["my_role"],
-        created_at=base_workspace["created_at"],
-        updated_at=BASE_TIME,
+        id=workspace.id,
+        name=workspace.name,
+        description=workspace.description,
+        type=workspace.type,
+        access_mode=workspace.access_mode,
+        my_role=workspace.my_role,
+        created_at=workspace.created_at,
+        updated_at=workspace.updated_at,
     )
 
 
@@ -192,8 +290,38 @@ async def update_workspace(
     summary="Удаление воркспейса",
 )
 async def delete_workspace(
+    principal: Annotated[
+        AuthenticatedPrincipal,
+        Depends(get_current_principal),
+    ],
+    use_case: Annotated[
+        DeleteWorkspace,
+        Depends(get_delete_workspace_use_case),
+    ],
     workspace_id: Annotated[UUID, Path()],
 ) -> Response:
-    """Acknowledge workspace deletion without body."""
+    """Delete workspace metadata and external storage resources."""
+    try:
+        await use_case.execute(
+            DeleteWorkspaceRequest(
+                workspace_id=workspace_id,
+                actor_user_id=principal.user_id,
+            ),
+        )
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except WorkspaceAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except WorkspaceLifecycleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,12 +1,13 @@
 """Тест запускает flake8"""
 
 import subprocess
+import sys
 
 
 def test_flake8():
     """Тест запускает flake8"""
     result = subprocess.run(
-        ["flake8", "./src", "./tests"],
+        [sys.executable, "-m", "flake8", "./src", "./tests"],
         capture_output=True,
         text=True,
         check=False,

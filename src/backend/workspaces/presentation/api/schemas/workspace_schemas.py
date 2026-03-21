@@ -1,36 +1,16 @@
-"""Schemas for mock workspaces API."""
+"""Schemas for workspaces API."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from shared.presentation.api.schemas.common import CursorPage
-
-
-class WorkspaceType(str, Enum):
-    """Allowed workspace type values."""
-
-    PRIVATE = "private"
-    SHARED = "shared"
-
-
-class WorkspaceAccessMode(str, Enum):
-    """Allowed workspace access modes."""
-
-    OWNER_ONLY = "owner_only"
-    BY_MEMBERSHIP = "by_membership"
-    GLOBAL = "global"
-
-
-class WorkspaceRole(str, Enum):
-    """User role inside a workspace."""
-
-    ADMIN = "admin"
-    USER = "user"
+from workspaces.domain.entities.workspace import WorkspaceAccessMode
+from workspaces.domain.entities.workspace import WorkspaceRole
+from workspaces.domain.entities.workspace import WorkspaceType
 
 
 class WorkspaceResponse(BaseModel):
