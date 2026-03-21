@@ -195,11 +195,19 @@ h3 {
   text-align: left;
   padding: 0 12px;
   background: transparent;
-  color: var(--danger);
+  color: var(--ink);
   font-weight: 700;
 }
 
 .account-menu__action:hover {
+  background: rgba(23, 48, 42, 0.06);
+}
+
+.account-menu__action--danger {
+  color: var(--danger);
+}
+
+.account-menu__action--danger:hover {
   background: var(--danger-soft);
 }
 
