@@ -13,7 +13,9 @@ from messages.presentation.api.schemas.message_schemas import (
 from messages.presentation.api.schemas.message_schemas import (
     CreateMessageResponse,
 )
-from messages.presentation.api.schemas.message_schemas import MessageListResponse
+from messages.presentation.api.schemas.message_schemas import (
+    MessageListResponse,
+)
 from messages.presentation.api.schemas.message_schemas import MessageResponse
 from shared.presentation.api.dependencies.security import get_current_principal
 from shared.presentation.api.mock_data import ASSISTANT_TIME

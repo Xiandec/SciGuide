@@ -18,8 +18,12 @@ from workspaces.presentation.api.schemas.workspace_schemas import (
 from workspaces.presentation.api.schemas.workspace_schemas import (
     UpdateWorkspaceRequest,
 )
-from workspaces.presentation.api.schemas.workspace_schemas import WorkspaceListResponse
-from workspaces.presentation.api.schemas.workspace_schemas import WorkspaceResponse
+from workspaces.presentation.api.schemas.workspace_schemas import (
+    WorkspaceListResponse,
+)
+from workspaces.presentation.api.schemas.workspace_schemas import (
+    WorkspaceResponse,
+)
 
 router = APIRouter(
     prefix="/workspaces",

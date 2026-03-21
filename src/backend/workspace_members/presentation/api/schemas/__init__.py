@@ -3,7 +3,9 @@
 from workspace_members.presentation.api.schemas.member_schemas import (
     AddWorkspaceMemberRequest,
 )
-from workspace_members.presentation.api.schemas.member_schemas import MemberRole
+from workspace_members.presentation.api.schemas.member_schemas import (
+    MemberRole,
+)
 from workspace_members.presentation.api.schemas.member_schemas import (
     UpdateWorkspaceMemberRequest,
 )

@@ -43,7 +43,10 @@ async def lifespan(app_instance: FastAPI):
 
 app = FastAPI(
     title="SciGuide Backend",
-    description="Сервис для автоматической справочной системы на основе языковых моделей для выбранного научного направления",
+    description=(
+        "Сервис для автоматической справочной системы на основе "
+        "языковых моделей для выбранного научного направления"
+    ),
     version="0.0.0",
     debug=settings.debug,
     lifespan=lifespan,

@@ -11,8 +11,12 @@ from workspace_documents.presentation.api.routes.documents import (
 from workspace_members.presentation.api.routes.members import (
     router as members_router,
 )
-from workspace_prompt.presentation.api.routes.prompt import router as prompt_router
-from workspaces.presentation.api.routes.workspaces import router as workspaces_router
+from workspace_prompt.presentation.api.routes.prompt import (
+    router as prompt_router,
+)
+from workspaces.presentation.api.routes.workspaces import (
+    router as workspaces_router,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth_router)

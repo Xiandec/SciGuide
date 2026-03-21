@@ -21,7 +21,11 @@ class WorkspaceMemberResponse(BaseModel):
 
     user_id: UUID
     email: EmailStr | None = None
-    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    display_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+    )
     role: MemberRole
     joined_at: datetime
 

@@ -89,8 +89,8 @@ services:
   # Backend service
   sciguide-backend:
     build:
-      context: ./src/backend
-      dockerfile: Dockerfile
+      context: ./src
+      dockerfile: src/backend/Dockerfile
     container_name: sciguide-backend
     restart: unless-stopped
     ports:

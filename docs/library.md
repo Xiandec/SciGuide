@@ -58,7 +58,7 @@
 Пример пользовательского сценария:
 
 ```python
-from sciguide import PipelineManager
+from sciguide_pipeline import PipelineManager
 
 manager = PipelineManager(config)
 
@@ -82,7 +82,7 @@ search_result = manager.search.run(query="Что такое graph-guided retriev
 Пример пользовательского сценария:
 
 ```python
-from sciguide import PipelineManager
+from sciguide_pipeline import PipelineManager
 
 manager = PipelineManager(config)
 
