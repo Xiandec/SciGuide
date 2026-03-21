@@ -13,6 +13,7 @@ import {
   messageRoleLabels,
   messageStatusLabels,
 } from '@/shared/lib/format'
+import RichTextMessage from '@/shared/ui/RichTextMessage.vue'
 import StatusBadge from '@/shared/ui/StatusBadge.vue'
 
 const props = defineProps({
@@ -294,7 +295,12 @@ async function handleSendMessage() {
             </div>
           </div>
 
-          <p class="message-card__body">{{ message.content }}</p>
+          <RichTextMessage
+            v-if="message.role === 'assistant'"
+            class="message-card__body"
+            :content="message.content"
+          />
+          <p v-else class="message-card__body message-card__body--plain">{{ message.content }}</p>
         </article>
       </div>
 

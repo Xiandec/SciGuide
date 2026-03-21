@@ -9,6 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "dompurify": "^3.3.3",
+    "katex": "^0.16.40",
+    "markdown-it": "^14.1.1",
+    "markdown-it-texmath": "^1.0.0",
     "vue": "^3.5.29",
     "vue-router": "^5.0.4"
   },
