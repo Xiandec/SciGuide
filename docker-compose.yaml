@@ -78,6 +78,50 @@ services:
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     networks:
       - sciguide-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Qdrant для семантического поиска
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: sciguide-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - sciguide-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Neo4j для графовой модели
+  neo4j:
+    image: neo4j:latest
+    container_name: sciguide-neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-password}
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - sciguide-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Flyway миграции
   flyway:
@@ -111,15 +155,27 @@ services:
     container_name: sciguide-backend
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-8000}:${APP_PORT:-8000}"
+      - "${APP_PORT:-8000}:8000"
     env_file:
       - ./.env
+    environment:
+      - APP_PORT=8000
+      - WORKSPACE_LIFECYCLE_MODE=${WORKSPACE_LIFECYCLE_MODE:-http}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - NEO4J_URL=${NEO4J_URL:-http://neo4j:7474}
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-password}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      neo4j:
         condition: service_started
       flyway:
         condition: service_completed_successfully
@@ -137,10 +193,67 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Frontend service
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    container_name: sciguide-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_PROXY_TARGET=http://sciguide-backend:8000
+    depends_on:
+      sciguide-backend:
+        condition: service_healthy
+    expose:
+      - "5173"
+    networks:
+      - sciguide-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:5173 > /dev/null || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx reverse proxy
+  nginx:
+    build:
+      context: ./src/nginx
+      dockerfile: Dockerfile
+    container_name: sciguide-nginx
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      sciguide-backend:
+        condition: service_healthy
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    networks:
+      - sciguide-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   db_data:
   redis_data:
   minio_data:
+  qdrant_data:
+  neo4j_data:
+  neo4j_logs:
 
 networks:
   sciguide-network:

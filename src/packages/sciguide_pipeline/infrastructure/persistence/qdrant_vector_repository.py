@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 
 from ...domain.entities import TextChunk, VectorSearchMatch
 from ...domain.exceptions import MissingDependencyError
@@ -66,7 +67,7 @@ class QdrantVectorRepository(VectorRepository):
 
         points = [
             PointStruct(
-                id=chunk.id,
+                id=self._make_point_id(chunk.id),
                 vector=list(embedding),
                 payload={
                     "chunk_id": chunk.id,
@@ -100,8 +101,8 @@ class QdrantVectorRepository(VectorRepository):
         return [
             VectorSearchMatch(
                 chunk_id=str(
-                    getattr(result, "id", None)
-                    or result.payload.get("chunk_id", "")
+                    result.payload.get("chunk_id", "")
+                    or getattr(result, "id", None)
                 ),
                 score=float(result.score),
                 payload=dict(result.payload or {}),
@@ -131,3 +132,7 @@ class QdrantVectorRepository(VectorRepository):
         if isinstance(value, (list, tuple, set)):
             return [cls._sanitize_value(item) for item in value]
         return str(value)
+
+    @staticmethod
+    def _make_point_id(chunk_id: str) -> str:
+        return str(uuid5(NAMESPACE_URL, f"sciguide:{chunk_id}"))

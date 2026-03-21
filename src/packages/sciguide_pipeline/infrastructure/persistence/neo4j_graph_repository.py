@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+import json
 from typing import Any
 
 from ...domain.entities import TextChunk
@@ -153,7 +154,7 @@ class Neo4jGraphRepository(GraphRepository):
             MERGE (chunk:Chunk {namespace: $namespace, chunk_id: $chunk_id})
             SET chunk.document_id = $document_id,
                 chunk.text = $text,
-                chunk.metadata = $metadata,
+                chunk.metadata_json = $metadata_json,
                 chunk.sequence_number = $sequence_number
             WITH chunk
             UNWIND $concepts AS concept_name
@@ -164,7 +165,7 @@ class Neo4jGraphRepository(GraphRepository):
             chunk_id=chunk.id,
             document_id=chunk.document_id,
             text=chunk.text,
-            metadata=cls._sanitize_mapping(chunk.metadata),
+            metadata_json=cls._serialize_mapping(chunk.metadata),
             sequence_number=chunk.sequence_number,
             concepts=list(chunk.concepts),
         )
@@ -254,3 +255,11 @@ class Neo4jGraphRepository(GraphRepository):
         if isinstance(value, (list, tuple, set)):
             return [cls._sanitize_value(item) for item in value]
         return str(value)
+
+    @classmethod
+    def _serialize_mapping(cls, mapping: dict[str, Any]) -> str:
+        return json.dumps(
+            cls._sanitize_mapping(mapping),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
