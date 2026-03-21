@@ -30,6 +30,12 @@ from workspace_documents.domain.repositories.document_storage import (
 from workspace_documents.domain.repositories.workspace_document_repository import (  # noqa: E501
     WorkspaceDocumentRepository,
 )
+from workspace_documents.domain.services.workspace_document_indexing_dispatcher import (  # noqa: E501
+    WorkspaceDocumentIndexingDispatcher,
+)
+from workspace_documents.infrastructure.dispatch import (
+    CeleryWorkspaceDocumentIndexingDispatcher,
+)
 from workspace_documents.infrastructure.persistence import (
     PostgresWorkspaceDocumentRepository,
 )
@@ -49,6 +55,12 @@ def get_workspace_document_repository(
 ) -> WorkspaceDocumentRepository:
     """Build workspace document repository."""
     return PostgresWorkspaceDocumentRepository(pool)
+
+
+def get_workspace_document_indexing_dispatcher(
+) -> WorkspaceDocumentIndexingDispatcher:
+    """Build background indexing dispatcher."""
+    return CeleryWorkspaceDocumentIndexingDispatcher()
 
 
 @lru_cache(maxsize=1)
@@ -87,12 +99,16 @@ def get_upload_workspace_document_use_case(
         get_workspace_document_repository,
     ),
     document_storage: DocumentStorage = Depends(get_document_storage),
+    indexing_dispatcher: WorkspaceDocumentIndexingDispatcher = Depends(
+        get_workspace_document_indexing_dispatcher,
+    ),
 ) -> UploadWorkspaceDocument:
     """Build upload workspace document use case."""
     return UploadWorkspaceDocument(
         workspace_repository=workspace_repository,
         document_repository=document_repository,
         document_storage=document_storage,
+        indexing_dispatcher=indexing_dispatcher,
     )
 
 

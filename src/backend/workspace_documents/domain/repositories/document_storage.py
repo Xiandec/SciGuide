@@ -26,3 +26,7 @@ class DocumentStorage(ABC):
     @abstractmethod
     async def delete(self, *, storage_key: str) -> None:
         """Delete stored document content."""
+
+    @abstractmethod
+    async def read_bytes(self, *, storage_key: str) -> bytes:
+        """Load stored document bytes by storage key."""

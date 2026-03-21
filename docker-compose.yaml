@@ -158,14 +158,6 @@ services:
       - "${APP_PORT:-8000}:8000"
     env_file:
       - ./.env
-    environment:
-      - APP_PORT=8000
-      - WORKSPACE_LIFECYCLE_MODE=${WORKSPACE_LIFECYCLE_MODE:-http}
-      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
-      - NEO4J_URL=${NEO4J_URL:-http://neo4j:7474}
-      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
-      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-password}
-      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
     depends_on:
       db:
         condition: service_healthy
@@ -179,6 +171,8 @@ services:
         condition: service_started
       flyway:
         condition: service_completed_successfully
+    volumes:
+      - ./hf_cache:${PIPELINE_MODEL_CACHE_DIR:-/app/hf_cache}
     networks:
       - sciguide-network
     healthcheck:
@@ -187,6 +181,39 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Celery worker для фоновой индексации документов
+  sciguide-worker:
+    build:
+      context: ./src
+      dockerfile: backend/Dockerfile
+    container_name: sciguide-worker
+    restart: unless-stopped
+    command: celery -A celery_app:celery_app worker --loglevel=INFO
+    env_file:
+      - ./.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      neo4j:
+        condition: service_started
+      flyway:
+        condition: service_completed_successfully
+    volumes:
+      - ./hf_cache:${PIPELINE_MODEL_CACHE_DIR:-/app/hf_cache}
+    networks:
+      - sciguide-network
     logging:
       driver: "json-file"
       options:

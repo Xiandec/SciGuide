@@ -47,3 +47,15 @@ class WorkspaceDocumentRepository(ABC):
         document_id: UUID,
     ) -> WorkspaceDocument | None:
         """Delete a document and return its previous metadata."""
+
+    @abstractmethod
+    async def update_processing_state(
+        self,
+        *,
+        workspace_id: UUID,
+        document_id: UUID,
+        status: str,
+        processing_stage: str,
+        processing_error: str | None,
+    ) -> WorkspaceDocument | None:
+        """Update document processing state and return fresh metadata."""

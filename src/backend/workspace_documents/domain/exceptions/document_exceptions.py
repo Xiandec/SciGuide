@@ -31,3 +31,10 @@ class WorkspaceDocumentStorageError(WorkspaceDocumentDomainError):
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
+
+
+class WorkspaceDocumentDispatchError(WorkspaceDocumentDomainError):
+    """Raised when background indexing cannot be enqueued."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)

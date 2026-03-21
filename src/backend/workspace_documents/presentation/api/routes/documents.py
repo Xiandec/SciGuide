@@ -48,6 +48,9 @@ from workspace_documents.domain.exceptions.document_exceptions import (
     WorkspaceDocumentAccessDeniedError,
 )
 from workspace_documents.domain.exceptions.document_exceptions import (
+    WorkspaceDocumentDispatchError,
+)
+from workspace_documents.domain.exceptions.document_exceptions import (
     WorkspaceDocumentNotFoundError,
 )
 from workspace_documents.domain.exceptions.document_exceptions import (
@@ -194,6 +197,11 @@ async def upload_document(
             detail=str(exc),
         ) from exc
     except WorkspaceDocumentStorageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except WorkspaceDocumentDispatchError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),

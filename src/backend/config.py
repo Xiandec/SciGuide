@@ -1,6 +1,6 @@
 """Configuration settings for the application."""
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     redis_password: str | None = Field(
         default=None,
         validation_alias="REDIS_PASSWORD",
+    )
+    qdrant_api_key: str | None = Field(
+        default=None,
+        validation_alias="QDRANT_API_KEY",
+    )
+    qdrant_prefer_grpc: bool = Field(
+        default=False,
+        validation_alias="QDRANT_PREFER_GRPC",
     )
 
     # Workspace lifecycle integrations
@@ -116,6 +124,61 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="MINIO_REGION",
     )
+    pipeline_neo4j_uri: str = Field(
+        default="bolt://neo4j:7687",
+        validation_alias="PIPELINE_NEO4J_URI",
+    )
+    openrouter_api_key: str = Field(
+        default="",
+        validation_alias="OPENROUTER_API_KEY",
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        validation_alias="OPENROUTER_BASE_URL",
+    )
+    openrouter_model_name: str = Field(
+        default="nvidia/nemotron-3-super-120b-a12b:free",
+        validation_alias="OPENROUTER_MODEL_NAME",
+    )
+    pipeline_embedding_model_name: str = Field(
+        default="BAAI/bge-m3",
+        validation_alias="PIPELINE_EMBEDDING_MODEL_NAME",
+    )
+    pipeline_reranker_model_name: str = Field(
+        default="BAAI/bge-reranker-v2-m3",
+        validation_alias="PIPELINE_RERANKER_MODEL_NAME",
+    )
+    pipeline_model_cache_dir: str = Field(
+        default="/app/data/hf_cache",
+        validation_alias="PIPELINE_MODEL_CACHE_DIR",
+    )
+    huggingface_token: str | None = Field(
+        default=None,
+        validation_alias="HUGGINGFACE_TOKEN",
+    )
+    pipeline_chunk_size: int = Field(
+        default=900,
+        validation_alias="PIPELINE_CHUNK_SIZE",
+    )
+    pipeline_chunk_overlap: int = Field(
+        default=120,
+        validation_alias="PIPELINE_CHUNK_OVERLAP",
+    )
+    pipeline_request_timeout_seconds: float = Field(
+        default=60.0,
+        validation_alias="PIPELINE_REQUEST_TIMEOUT_SECONDS",
+    )
+
+    @field_validator("openrouter_api_key", mode="before")
+    @classmethod
+    def normalize_openrouter_api_key(
+        cls,
+        value: str | None,
+    ) -> str:
+        """Strip the OpenRouter API key before it reaches consumers."""
+        if value is None:
+            return ""
+        return value.strip()
 
 
 settings = Settings()

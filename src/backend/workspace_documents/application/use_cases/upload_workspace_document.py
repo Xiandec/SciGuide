@@ -30,6 +30,9 @@ from workspace_documents.domain.entities.workspace_document import (
     WorkspaceDocument,
 )
 from workspace_documents.domain.exceptions.document_exceptions import (
+    WorkspaceDocumentDispatchError,
+)
+from workspace_documents.domain.exceptions.document_exceptions import (
     WorkspaceDocumentStorageError,
 )
 from workspace_documents.domain.repositories.document_storage import (
@@ -37,6 +40,9 @@ from workspace_documents.domain.repositories.document_storage import (
 )
 from workspace_documents.domain.repositories.workspace_document_repository import (  # noqa: E501
     WorkspaceDocumentRepository,
+)
+from workspace_documents.domain.services.workspace_document_indexing_dispatcher import (  # noqa: E501
+    WorkspaceDocumentIndexingDispatcher,
 )
 
 
@@ -60,10 +66,12 @@ class UploadWorkspaceDocument:
         workspace_repository: WorkspaceRepository,
         document_repository: WorkspaceDocumentRepository,
         document_storage: DocumentStorage,
+        indexing_dispatcher: WorkspaceDocumentIndexingDispatcher,
     ) -> None:
         self._workspace_repository = workspace_repository
         self._document_repository = document_repository
         self._document_storage = document_storage
+        self._indexing_dispatcher = indexing_dispatcher
 
     async def execute(
         self,
@@ -117,6 +125,16 @@ class UploadWorkspaceDocument:
             await self._delete_stored_file(storage_key)
             raise
 
+        try:
+            await self._indexing_dispatcher.enqueue(
+                workspace_id=request.workspace_id,
+                document_id=document.id,
+            )
+        except WorkspaceDocumentDispatchError:
+            await self._delete_document_metadata(document)
+            await self._delete_stored_file(storage_key)
+            raise
+
         return WorkspaceDocumentDTO.from_entity(created_document)
 
     async def _delete_stored_file(self, storage_key: str) -> None:
@@ -125,3 +143,13 @@ class UploadWorkspaceDocument:
             await self._document_storage.delete(storage_key=storage_key)
         except OSError:
             return
+
+    async def _delete_document_metadata(
+        self,
+        document: WorkspaceDocument,
+    ) -> None:
+        """Best-effort cleanup for failed task dispatch."""
+        await self._document_repository.delete_by_id(
+            workspace_id=document.workspace_id,
+            document_id=document.id,
+        )

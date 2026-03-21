@@ -80,6 +80,20 @@ class MinioDocumentStorage(DocumentStorage):
         except Exception as exc:
             raise OSError("Failed to delete object from MinIO") from exc
 
+    async def read_bytes(self, *, storage_key: str) -> bytes:
+        """Download stored document bytes from MinIO."""
+        self._ensure_bucket()
+        response = None
+        try:
+            response = self._client.get_object(self._bucket_name, storage_key)
+            return response.read()
+        except Exception as exc:
+            raise OSError("Failed to read object from MinIO") from exc
+        finally:
+            if response is not None:
+                response.close()
+                response.release_conn()
+
     def _ensure_bucket(self) -> None:
         """Create bucket lazily on first use."""
         if self._bucket_initialized:

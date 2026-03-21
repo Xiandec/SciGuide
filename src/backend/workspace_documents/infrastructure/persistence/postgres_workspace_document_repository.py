@@ -209,6 +209,50 @@ class PostgresWorkspaceDocumentRepository(WorkspaceDocumentRepository):
 
         return self._build_document(record)
 
+    async def update_processing_state(
+        self,
+        *,
+        workspace_id: UUID,
+        document_id: UUID,
+        status: str,
+        processing_stage: str,
+        processing_error: str | None,
+    ) -> WorkspaceDocument | None:
+        """Update processing state and return fresh document metadata."""
+        record = await self._pool.fetchrow(
+            """
+            UPDATE workspace_documents
+            SET
+                status = $3,
+                processing_stage = $4,
+                processing_error = $5
+            WHERE workspace_id = $1
+                AND id = $2
+            RETURNING
+                id,
+                workspace_id,
+                filename,
+                storage_key,
+                content_type,
+                size_bytes,
+                status,
+                processing_stage,
+                processing_error,
+                uploaded_by,
+                created_at,
+                updated_at
+            """,
+            workspace_id,
+            document_id,
+            status,
+            processing_stage,
+            processing_error,
+        )
+        if record is None:
+            return None
+
+        return self._build_document(record)
+
     @staticmethod
     def _build_document(record: Record) -> WorkspaceDocument:
         """Map a PostgreSQL row to a workspace document entity."""

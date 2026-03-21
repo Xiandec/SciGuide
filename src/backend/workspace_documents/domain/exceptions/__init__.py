@@ -7,6 +7,9 @@ from workspace_documents.domain.exceptions.document_exceptions import (
     WorkspaceDocumentDomainError,
 )
 from workspace_documents.domain.exceptions.document_exceptions import (
+    WorkspaceDocumentDispatchError,
+)
+from workspace_documents.domain.exceptions.document_exceptions import (
     WorkspaceDocumentNotFoundError,
 )
 from workspace_documents.domain.exceptions.document_exceptions import (
@@ -16,6 +19,7 @@ from workspace_documents.domain.exceptions.document_exceptions import (
 __all__ = [
     "WorkspaceDocumentAccessDeniedError",
     "WorkspaceDocumentDomainError",
+    "WorkspaceDocumentDispatchError",
     "WorkspaceDocumentNotFoundError",
     "WorkspaceDocumentStorageError",
 ]
