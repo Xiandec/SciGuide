@@ -24,6 +24,7 @@ markdown-it-py==4.0.0
 MarkupSafe==3.0.2
 mccabe==0.7.0
 mdurl==0.1.2
+minio==7.2.18
 packaging==25.0
 passlib==1.7.4
 pillow==11.3.0

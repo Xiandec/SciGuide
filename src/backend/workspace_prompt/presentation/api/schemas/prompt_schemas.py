@@ -1,4 +1,4 @@
-"""Schemas for mock workspace prompt API."""
+"""Schemas for workspace prompt API."""
 
 from __future__ import annotations
 

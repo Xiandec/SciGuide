@@ -1,34 +1,19 @@
-"""Schemas for mock workspace documents API."""
+"""Schemas for workspace documents API."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from shared.presentation.api.schemas.common import CursorPage
-
-
-class DocumentStatus(str, Enum):
-    """Allowed document statuses."""
-
-    UPLOADED = "uploaded"
-    PROCESSING = "processing"
-    PROCESSED = "processed"
-    FAILED = "failed"
-
-
-class DocumentStage(str, Enum):
-    """Allowed document processing stages."""
-
-    UPLOADED = "uploaded"
-    TEXT_EXTRACTION = "text_extraction"
-    CHUNKING = "chunking"
-    EMBEDDING = "embedding"
-    GRAPH_UPDATE = "graph_update"
-    COMPLETED = "completed"
+from workspace_documents.domain.entities.workspace_document import (
+    DocumentStage,
+)
+from workspace_documents.domain.entities.workspace_document import (
+    DocumentStatus,
+)
 
 
 class WorkspaceDocumentResponse(BaseModel):

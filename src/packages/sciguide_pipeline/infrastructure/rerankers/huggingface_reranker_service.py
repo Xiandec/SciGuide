@@ -31,7 +31,7 @@ class HuggingFaceRerankerService(RerankerService):
             ) from error
 
         model_kwargs: dict[str, Any] = {
-            "cache_dir": str(self._cache_dir),
+            "cache_folder": str(self._cache_dir),
         }
         if token is not None:
             model_kwargs["token"] = token

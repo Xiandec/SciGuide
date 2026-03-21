@@ -92,6 +92,30 @@ class Settings(BaseSettings):
         default="WorkspaceGraphRoot",
         validation_alias="NEO4J_WORKSPACE_ROOT_LABEL",
     )
+    minio_endpoint: str = Field(
+        default="minio:9000",
+        validation_alias="MINIO_ENDPOINT",
+    )
+    minio_access_key: str = Field(
+        default="minioadmin",
+        validation_alias="MINIO_ACCESS_KEY",
+    )
+    minio_secret_key: str = Field(
+        default="minioadmin",
+        validation_alias="MINIO_SECRET_KEY",
+    )
+    minio_secure: bool = Field(
+        default=False,
+        validation_alias="MINIO_SECURE",
+    )
+    minio_bucket_name: str = Field(
+        default="workspace-documents",
+        validation_alias="MINIO_BUCKET_NAME",
+    )
+    minio_region: str | None = Field(
+        default=None,
+        validation_alias="MINIO_REGION",
+    )
 
 
 settings = Settings()

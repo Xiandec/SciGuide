@@ -62,6 +62,23 @@ services:
     networks:
       - sciguide-network
 
+  # MinIO для хранения документов воркспейсов
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    container_name: sciguide-minio
+    restart: unless-stopped
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - sciguide-network
+
   # Flyway миграции
   flyway:
     image: flyway/flyway:11
@@ -90,7 +107,7 @@ services:
   sciguide-backend:
     build:
       context: ./src
-      dockerfile: src/backend/Dockerfile
+      dockerfile: backend/Dockerfile
     container_name: sciguide-backend
     restart: unless-stopped
     ports:
@@ -102,6 +119,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
       flyway:
         condition: service_completed_successfully
     networks:
@@ -121,6 +140,7 @@ services:
 volumes:
   db_data:
   redis_data:
+  minio_data:
 
 networks:
   sciguide-network:
