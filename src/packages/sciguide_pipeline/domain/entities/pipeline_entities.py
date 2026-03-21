@@ -37,7 +37,7 @@ class TextChunk:
     text: str
     sequence_number: int
     metadata: dict[str, Any] = field(default_factory=dict)
-    concepts: tuple[str, ...] = ()
+    entities: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

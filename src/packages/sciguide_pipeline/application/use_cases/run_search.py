@@ -6,8 +6,8 @@ from ..dto import RunSearchRequest
 from ...domain.entities import SearchItem, SearchReport
 from ...domain.repositories import GraphRepository, VectorRepository
 from ...domain.services import (
-    ConceptExtractor,
     EmbeddingService,
+    EntityExtractor,
     RerankerService,
     WeightedScoreCombiner,
 )
@@ -18,14 +18,14 @@ class RunSearch:
 
     def __init__(
         self,
-        concept_extractor: ConceptExtractor,
+        entity_extractor: EntityExtractor,
         embedding_service: EmbeddingService,
         reranker_service: RerankerService,
         vector_repository: VectorRepository,
         graph_repository: GraphRepository,
         score_combiner: WeightedScoreCombiner,
     ) -> None:
-        self._concept_extractor = concept_extractor
+        self._entity_extractor = entity_extractor
         self._embedding_service = embedding_service
         self._reranker_service = reranker_service
         self._vector_repository = vector_repository
@@ -46,10 +46,12 @@ class RunSearch:
                 candidate_count=0,
             )
 
-        query_concepts = self._concept_extractor.extract(request.query)
+        query_entities = self._entity_extractor.extract(request.query)
+        query_tokens = self._entity_extractor.extract_tokens(request.query)
         chunk_ids = [candidate.chunk_id for candidate in vector_candidates]
         graph_scores = self._graph_repository.score_chunks(
-            query_concepts=query_concepts,
+            query_entities=query_entities,
+            query_tokens=query_tokens,
             chunk_ids=chunk_ids,
         )
 

@@ -1,4 +1,4 @@
-"""Schemas for mock chats API."""
+"""Schemas for chats API."""
 
 from __future__ import annotations
 

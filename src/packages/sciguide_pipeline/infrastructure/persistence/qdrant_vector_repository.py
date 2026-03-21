@@ -74,7 +74,7 @@ class QdrantVectorRepository(VectorRepository):
                     "document_id": chunk.document_id,
                     "text": chunk.text,
                     "sequence_number": chunk.sequence_number,
-                    "concepts": list(chunk.concepts),
+                    "entities": list(chunk.entities),
                     "metadata": self._sanitize_mapping(chunk.metadata),
                 },
             )

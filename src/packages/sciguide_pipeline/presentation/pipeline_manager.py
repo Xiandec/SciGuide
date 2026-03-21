@@ -9,13 +9,12 @@ from ..application.use_cases import RunChunking, RunSearch
 from ..domain.entities import ChunkingReport, SearchReport, SourceDocument
 from ..domain.services import WeightedScoreCombiner
 from ..infrastructure.embeddings import HuggingFaceEmbeddingService
-from ..infrastructure.llm import OpenRouterChatModel
 from ..infrastructure.persistence import (
     Neo4jGraphRepository,
     QdrantVectorRepository,
 )
 from ..infrastructure.processing import (
-    LangChainConceptExtractor,
+    DeterministicEntityExtractor,
     LangChainTextChunker,
 )
 from ..infrastructure.rerankers import HuggingFaceRerankerService
@@ -76,14 +75,11 @@ class PipelineManager:
         neo4j_uri: str,
         neo4j_username: str,
         neo4j_password: str,
-        llm_api_key: str,
-        llm_model_name: str,
         embedding_model_name: str,
         reranker_model_name: str,
         model_cache_dir: str | Path,
         *,
         graph_namespace: str | None = None,
-        openrouter_base_url: str = "https://openrouter.ai/api/v1",
         qdrant_api_key: str | None = None,
         qdrant_prefer_grpc: bool = False,
         neo4j_database: str = "neo4j",
@@ -100,15 +96,7 @@ class PipelineManager:
         cache_dir = Path(model_cache_dir)
         resolved_graph_namespace = graph_namespace or qdrant_collection_name
 
-        self._chat_model = OpenRouterChatModel(
-            api_key=llm_api_key,
-            model_name=llm_model_name,
-            base_url=openrouter_base_url,
-            request_timeout=request_timeout,
-        )
-        self._concept_extractor = LangChainConceptExtractor(
-            chat_model=self._chat_model
-        )
+        self._entity_extractor = DeterministicEntityExtractor()
         self._text_chunker = LangChainTextChunker(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -152,7 +140,7 @@ class PipelineManager:
 
         self._chunking_use_case = RunChunking(
             text_chunker=self._text_chunker,
-            concept_extractor=self._concept_extractor,
+            entity_extractor=self._entity_extractor,
             embedding_service=self._embedding_service,
             vector_repository=self._vector_repository,
             graph_repository=self._graph_repository,
@@ -160,7 +148,7 @@ class PipelineManager:
             graph_namespace=resolved_graph_namespace,
         )
         self._search_use_case = RunSearch(
-            concept_extractor=self._concept_extractor,
+            entity_extractor=self._entity_extractor,
             embedding_service=self._embedding_service,
             reranker_service=self._reranker_service,
             vector_repository=self._vector_repository,

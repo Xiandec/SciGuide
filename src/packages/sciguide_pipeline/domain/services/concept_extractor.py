@@ -1,14 +1,9 @@
-"""Concept extraction contract."""
+"""Backward-compatible alias for the legacy concept extractor name."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from .entity_extractor import EntityExtractor
 
 
-class ConceptExtractor(ABC):
-    """Abstraction for extracting concepts from text."""
-
-    @abstractmethod
-    def extract(self, text: str) -> Sequence[str]:
-        """Extract normalized concepts from text."""
+class ConceptExtractor(EntityExtractor):
+    """Legacy alias kept for compatibility with earlier package versions."""

@@ -7,7 +7,11 @@ from dataclasses import replace
 from ..dto import RunChunkingRequest
 from ...domain.entities import ChunkingReport
 from ...domain.repositories import GraphRepository, VectorRepository
-from ...domain.services import ConceptExtractor, EmbeddingService, TextChunker
+from ...domain.services import (
+    EmbeddingService,
+    EntityExtractor,
+    TextChunker,
+)
 
 
 class RunChunking:
@@ -16,7 +20,7 @@ class RunChunking:
     def __init__(
         self,
         text_chunker: TextChunker,
-        concept_extractor: ConceptExtractor,
+        entity_extractor: EntityExtractor,
         embedding_service: EmbeddingService,
         vector_repository: VectorRepository,
         graph_repository: GraphRepository,
@@ -24,7 +28,7 @@ class RunChunking:
         graph_namespace: str,
     ) -> None:
         self._text_chunker = text_chunker
-        self._concept_extractor = concept_extractor
+        self._entity_extractor = entity_extractor
         self._embedding_service = embedding_service
         self._vector_repository = vector_repository
         self._graph_repository = graph_repository
@@ -45,7 +49,7 @@ class RunChunking:
         enriched_chunks = [
             replace(
                 chunk,
-                concepts=tuple(self._concept_extractor.extract(chunk.text)),
+                entities=tuple(self._entity_extractor.extract(chunk.text)),
             )
             for chunk in chunks
         ]

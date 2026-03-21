@@ -17,12 +17,13 @@ class GraphRepository(ABC):
 
     @abstractmethod
     def upsert_chunks(self, chunks: Sequence[TextChunk]) -> None:
-        """Persist chunk-to-concept projections."""
+        """Persist chunk-to-entity projections."""
 
     @abstractmethod
     def score_chunks(
         self,
-        query_concepts: Sequence[str],
+        query_entities: Sequence[str],
+        query_tokens: Sequence[str],
         chunk_ids: Sequence[str],
     ) -> dict[str, float]:
         """Return graph-based scores for candidate chunks."""

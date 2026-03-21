@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+import re
 
 from ...domain.services import ChatModel, ConceptExtractor
+
+_TOKEN_PATTERN = re.compile(
+    r"[0-9A-Za-zА-Яа-яЁё]+(?:-[0-9A-Za-zА-Яа-яЁё]+)*"
+)
 
 
 class LangChainConceptExtractor(ConceptExtractor):
@@ -45,3 +50,12 @@ class LangChainConceptExtractor(ConceptExtractor):
             if value and value not in normalized:
                 normalized.append(value)
         return normalized
+
+    def extract_tokens(self, text: str) -> Sequence[str]:
+        """Return normalized tokens for legacy compatibility."""
+        tokens: list[str] = []
+        for match in _TOKEN_PATTERN.finditer(text.lower()):
+            token = match.group(0)
+            if token not in tokens:
+                tokens.append(token)
+        return tokens
