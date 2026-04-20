@@ -3,5 +3,5 @@ to: typst
 standalone: true
 pdf-engine: typst
 metadata-file:
-  - build/metadata.yaml
-template: build/template.typ
+  - metadata/metadata.yaml
+template: metadata/template.typ

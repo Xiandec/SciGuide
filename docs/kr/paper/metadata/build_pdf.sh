@@ -2,14 +2,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KR_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/kr-build.XXXXXX")"
+PAPER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/paper-build.XXXXXX")"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
-MAIN_DOC="${KR_DIR}/Galimov_PM23-2.md"
+MAIN_DOC="${PAPER_DIR}/manuscript.md"
 REFS_DOC="${TMP_DIR}/90_references.md"
 APPENDICES_DOC="${TMP_DIR}/99_appendices.md"
-OUTPUT_PATH="${1:-${KR_DIR}/Galimov_PM23-2.pdf}"
+OUTPUT_DIR="${PAPER_DIR}/output"
+OUTPUT_PATH="${1:-${OUTPUT_DIR}/paper.pdf}"
+
+mkdir -p "${OUTPUT_DIR}"
 
 cat > "${REFS_DOC}" <<'EOF'
 # СПИСОК ЛИТЕРАТУРЫ И ИНТЕРНЕТ-РЕСУРСОВ
@@ -17,19 +20,19 @@ cat > "${REFS_DOC}" <<'EOF'
 ```{=typst}
 #set bibliography(title: none)
 #bibliography(
-  "build/references.bib",
-  style: "build/gost-r-7-0-100-2018-numeric-appearance.csl",
+  "metadata/references.bib",
+  style: "metadata/csl/gost-r-7-0-100-2018-numeric-appearance.csl",
 )
 ```
 EOF
 
 appendix_letters=(А Б В Г Д Е Ж И К Л М Н)
 
-if compgen -G "${KR_DIR}/appendices/*.md" > /dev/null; then
+if compgen -G "${PAPER_DIR}/appendices/*.md" > /dev/null; then
   appendix_index=0
   : > "${APPENDICES_DOC}"
 
-  for appendix in "${KR_DIR}"/appendices/*.md; do
+  for appendix in "${PAPER_DIR}"/appendices/*.md; do
     if (( appendix_index >= ${#appendix_letters[@]} )); then
       echo "Too many appendices for the configured lettering scheme." >&2
       exit 1
@@ -65,19 +68,19 @@ fi
 
 RELATIVE_INPUTS=()
 for input_path in "${PANDOC_INPUTS[@]}"; do
-  if [[ "${input_path}" == "${KR_DIR}/"* ]]; then
-    RELATIVE_INPUTS+=("${input_path#"${KR_DIR}/"}")
+  if [[ "${input_path}" == "${PAPER_DIR}/"* ]]; then
+    RELATIVE_INPUTS+=("${input_path#"${PAPER_DIR}/"}")
   else
     RELATIVE_INPUTS+=("${input_path}")
   fi
 done
 
 (
-  cd "${KR_DIR}"
+  cd "${PAPER_DIR}"
   pandoc \
-    --defaults build/defaults.yaml \
-    --lua-filter build/filters/code-listings.lua \
-    --lua-filter build/filters/citations-footnotes.lua \
+    --defaults metadata/defaults.yaml \
+    --lua-filter metadata/filters/code-listings.lua \
+    --lua-filter metadata/filters/citations-footnotes.lua \
     "${RELATIVE_INPUTS[@]}" \
     -o "${OUTPUT_PATH}"
 )
