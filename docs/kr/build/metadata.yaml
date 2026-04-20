@@ -1,0 +1,23 @@
+lang: ru
+mainfont: Times New Roman
+codefont: Courier New
+fontsize: 14pt
+papersize: a4
+margin:
+  top: 2cm
+  bottom: 2cm
+  left: 3cm
+  right: 1cm
+linestretch: 1.5
+title: Автоматическая справочная система для научных материалов на основе комбинированного retrieval-подхода
+work-kind: Курсовая работа
+ministry: Министерство науки и высшего образования Российской Федерации
+university: <Университет>
+institute: <Институт / факультет>
+department: <Кафедра>
+discipline: <Дисциплина>
+student: Галимов Тимур
+group: PM23-2
+supervisor: <ФИО руководителя>
+city: <Город>
+year: 2026

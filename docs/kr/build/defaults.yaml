@@ -1,0 +1,7 @@
+from: markdown+raw_attribute+fenced_divs+implicit_figures+table_captions+fenced_code_attributes+citations
+to: typst
+standalone: true
+pdf-engine: typst
+metadata-file:
+  - build/metadata.yaml
+template: build/template.typ
