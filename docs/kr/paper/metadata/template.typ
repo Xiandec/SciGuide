@@ -8,46 +8,78 @@
 
 #let title-page() = [
   #set align(center)
-  #text(weight: "regular")[
-    $if(ministry)$$ministry$$endif$ \
-    $if(university)$$university$$endif$ \
+  #set text(size: 12pt)
+  #set par(
+    justify: false,
+    first-line-indent: 0cm,
+    leading: 1.12em,
+    spacing: 0em,
+  )
+
+  #text(size: 10.5pt)[
+    $if(ministry-line-1)$$ministry-line-1$$endif$ \
+    $if(ministry-line-2)$$ministry-line-2$$endif$
+  ]
+
+  #v(0.22cm)
+
+  #text(size: 11pt, weight: "bold")[
+    $if(university-name-line-1)$«$university-name-line-1$$endif$ \
+    $if(university-name-line-2)$$university-name-line-2$»$endif$ \
+    $if(university-short-name)$($university-short-name$)$endif$
+  ]
+
+  #v(0.55cm)
+
+  #text(size: 11pt)[
+    $if(department)$$department$$endif$ \
+    $if(institute)$$institute$$endif$
+  ]
+
+  #v(0.95cm)
+
+  #text(size: 11pt, style: "italic")[
+    $if(discipline)$Дисциплина: «$discipline$»$endif$ \
+    $if(study-direction)$Направление подготовки: «$study-direction$»$endif$ \
+    $if(profile)$Профиль: «$profile$»$endif$ \
     $if(institute)$$institute$$endif$ \
-    $if(department)$$department$$endif$
+    $if(study-form)$Форма обучения $study-form$$endif$ \
+    $if(academic-year)$Учебный $academic-year$ год$endif$$if(semester)$, $semester$ семестр$endif$
   ]
 
-  #v(1.2cm)
-
-  #text(weight: "regular")[
-    $if(discipline)$Дисциплина: $discipline$$endif$
-  ]
-
-  #v(4.2cm)
+  #v(3.05cm)
 
   #text(weight: "bold")[
-    $if(work-kind)$$work-kind$$endif$
+    $if(work-kind)$$work-kind$ на тему:$endif$
   ]
 
-  #v(1cm)
+  #v(0.15cm)
 
-  #text(size: 16pt, weight: "bold")[
-    $title$
+  #text(weight: "bold")[
+    «$title$»
   ]
 
-  #v(3cm)
+  #v(3.0cm)
 
   #align(right)[
-    #block(width: 8.5cm)[
-      Выполнил: $if(student)$$student$$endif$ \
-      Группа: $if(group)$$group$$endif$ \
-      Руководитель: $if(supervisor)$$supervisor$$endif$
+    #block(width: 7.2cm)[
+      #set align(right)
+      #text(style: "italic")[Выполнил(а):] \
+      #v(0.5cm)
+      студент(ка) группы $if(group)$$group$$endif$ \
+      #v(0.5cm)
+      $if(student)$$student$$endif$ \
+      #v(1.15cm)
+      #text(style: "italic")[Научный руководитель:] \
+      #v(0.5cm)
+      $if(supervisor)$$supervisor$$endif$
     ]
   ]
 
   #v(1fr)
 
   #align(center)[
-    $if(city)$$city$$endif$ \
-    $if(year)$$year$$endif$
+    $if(city)$$city$$endif$ $if(year)$$year$$endif$
   ]
 ]
 
@@ -156,7 +188,6 @@
 )
 
 #title-page()
-#pagebreak()
 
 #outline(title: [Оглавление])
 
